@@ -1,0 +1,82 @@
+# TiO2 adsorption simulation - fixed wall
+
+# Files
+variable basename string "tio2_adsorption"
+#variable total_steps equal 5000000
+
+# System setup
+units real
+atom_style full
+boundary p p f
+read_data in.data
+
+# Group by atom IDs
+group tio2_fixed id 1:180
+group tio2_mobile id 181:360
+group norfloxacin id 361:402
+group water id 403:1602
+
+group fixed union tio2_fixed
+group mobile union tio2_mobile norfloxacin water
+fix freeze fixed setforce 0.0 0.0 0.0
+
+# ReaxFF
+pair_style reaxff/kk NULL
+pair_coeff * * CHONSMgPNaTiClFKLi.ff C F H N O Ti
+fix qeq all qeq/reaxff/kk 50 0.0 8.0 1e-6 reaxff
+
+# Neighbor list
+neighbor 2.5 bin
+neigh_modify every 20 delay 0 check yes
+
+# Fixed wall at 45 A
+fix wall_top all wall/reflect zhi 45.0
+print "Wall position fixed at 45.0 A"
+
+# Output
+thermo 1000
+thermo_style custom step temp pe ke etotal cpu spcpu
+log ${basename}.log
+
+# Minimization
+min_style cg
+minimize 1e-4 1e-6 1000 10000
+
+reset_timestep 0
+
+# Stage 1: Low temperature relaxation
+print "Stage 1: Low temperature relaxation (100K, 5ps)"
+velocity mobile create 100.0 12345
+timestep 0.05
+fix nvt1 mobile nvt/kk temp 100.0 100.0 100.0 
+dump traj1 all xtc 500 ${basename}_stage1.xtc
+run 100000  
+unfix nvt1
+undump traj1
+
+# Stage 2: Medium temperature relaxation - CONTINUE from previous velocities
+print "Stage 2: Medium temperature relaxation (200K, 10ps)"
+timestep 0.1
+fix nvt2 mobile nvt/kk temp 100.0 298.15 100.0  
+dump traj2 all xtc 1000 ${basename}_stage2.xtc
+run 200000  
+unfix nvt2
+undump traj2
+write_restart ${basename}_after_heating.restart
+
+# Stage 3: Final temperature equilibration (298.15K, 100 ps)
+print "Stage 3: Final temperature equilibration (298.15K, 100 ps)"
+timestep 0.1
+fix nvt3 mobile nvt/kk temp 298.15 298.15 100.0
+dump traj3 all xtc 1000 ${basename}_stage3.xtc
+
+restart 100000 ${basename}_eq_*.restart
+
+run 1000000
+
+undump traj3
+unfix nvt3
+
+write_data ${basename}_final.data
+write_restart ${basename}.restart
+print "Simulation completed"
