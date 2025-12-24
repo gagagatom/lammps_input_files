@@ -1,8 +1,8 @@
 # TiO2 adsorption simulation - fixed wall
+# GPU-kk
 
 # Files
 variable basename string "tio2_adsorption"
-#variable total_steps equal 5000000
 
 # System setup
 units real
@@ -49,33 +49,32 @@ print "Stage 1: Low temperature relaxation (100K, 5ps)"
 velocity mobile create 100.0 12345
 timestep 0.05
 fix nvt1 mobile nvt/kk temp 100.0 100.0 100.0 
-dump traj1 all xtc 500 ${basename}_stage1.xtc
+dump traj1 all xtc 1000 ${basename}_stage1.xtc
 run 100000  
 unfix nvt1
 undump traj1
+write_restart ${basename}_after_heating1.restart
 
 # Stage 2: Medium temperature relaxation - CONTINUE from previous velocities
 print "Stage 2: Medium temperature relaxation (200K, 10ps)"
-timestep 0.1
+timestep 0.05
 fix nvt2 mobile nvt/kk temp 100.0 298.15 100.0  
 dump traj2 all xtc 1000 ${basename}_stage2.xtc
 run 200000  
 unfix nvt2
 undump traj2
-write_restart ${basename}_after_heating.restart
+write_restart ${basename}_after_heating2.restart
 
-# Stage 3: Final temperature equilibration (298.15K, 100 ps)
-print "Stage 3: Final temperature equilibration (298.15K, 100 ps)"
-timestep 0.1
-fix nvt3 mobile nvt/kk temp 298.15 298.15 100.0
+# Stage 3: Final temperature equilibration - CONTINUE from previous velocities
+print "Stage 3: Final temperature equilibration (300K, 50ps)"
+timestep 0.05
+fix nvt3 mobile nvt/kk temp 298.15 298.15 100.0  
+fix restart_save all restart 100000 ${basename}_eq_*.restart
 dump traj3 all xtc 1000 ${basename}_stage3.xtc
-
-restart 100000 ${basename}_eq_*.restart
-
-run 1000000
-
-undump traj3
+run 1000000 
+unfix restart_save
 unfix nvt3
+undump traj3
 
 write_data ${basename}_final.data
 write_restart ${basename}.restart
