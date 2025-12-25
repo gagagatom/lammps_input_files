@@ -1,0 +1,47 @@
+# Quick test: direct equilibration at 298.15 K with small timestep
+
+variable basename string "tio2_adsorption"
+
+units real
+atom_style full
+boundary p p f
+read_data in.data
+
+# Groups 
+group tio2_fixed id 1:180
+group tio2_mobile id 181:360
+group norfloxacin id 361:402
+group water id 403:1602
+group fixed union tio2_fixed
+group mobile union tio2_mobile norfloxacin water
+
+fix freeze fixed setforce 0.0 0.0 0.0
+fix wall_top all wall/reflect zhi 45.0
+
+# ReaxFF
+pair_style reaxff/kk NULL
+pair_coeff * * CHONSMgPNaTiClFKLi.ff C F H N O Ti
+fix qeq all qeq/reaxff/kk 50 0.0 8.0 1e-6 reaxff
+
+neigh_modify every 20 delay 0 check yes
+
+thermo 1000
+thermo_style custom step temp pe ke etotal press density
+
+# Minimization 
+minimize 1e-4 1e-6 1000 10000
+
+reset_timestep 0
+#NVT
+print "Direct equilibration at 298.15 K"
+velocity mobile create 298.15 54321 dist gaussian   
+timestep 0.1                                        
+fix nvt mobile nvt/kk temp 298.15 298.15 100.0
+dump traj_test all xtc 1000 ${basename}_1.xtc         # 每 0.05 ps 一帧，方便看细节
+
+run 200000                                           # 20000 steps × 0.1 fs = 20 ps
+
+undump traj_test
+unfix nvt
+write_restart ${basename}.restart
+print "Test completed"
