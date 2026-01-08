@@ -1,0 +1,50 @@
+UNITS LENGTH=A
+FLUSH STRIDE=500
+
+
+a1: GROUP ATOMS=1458
+a2: GROUP ATOMS=1459
+a3: GROUP ATOMS=1469
+nor_all: GROUP ATOMS=1458-1519
+
+
+v12: DISTANCE ATOMS=a1,a2 COMPONENTS
+v13: DISTANCE ATOMS=a1,a3 COMPONENTS
+
+
+nx: CUSTOM ARG=v12.y,v12.z,v13.y,v13.z VAR=y1,z1,y2,z2 FUNC=y1*z2-z1*y2 PERIODIC=NO
+ny: CUSTOM ARG=v12.z,v12.x,v13.z,v13.x VAR=z1,x1,z2,x2 FUNC=z1*x2-x1*z2 PERIODIC=NO
+nz: CUSTOM ARG=v12.x,v12.y,v13.x,v13.y VAR=x1,y1,x2,y2 FUNC=x1*y2-y1*x2 PERIODIC=NO
+
+
+n_norm: CUSTOM ARG=nx,ny,nz VAR=nx,ny,nz FUNC=sqrt(nx*nx+ny*ny+nz*nz)+1e-8 PERIODIC=NO
+ux: CUSTOM ARG=nx,n_norm VAR=n,l FUNC=n/l PERIODIC=NO
+uy: CUSTOM ARG=ny,n_norm VAR=n,l FUNC=n/l PERIODIC=NO
+uz: CUSTOM ARG=nz,n_norm VAR=n,l FUNC=n/l PERIODIC=NO
+
+
+uz_abs: CUSTOM ARG=uz VAR=z FUNC=min(1.0,abs(z)) PERIODIC=NO
+angle: CUSTOM ARG=uz_abs VAR=z FUNC=acos(z)*180/pi PERIODIC=NO
+
+
+nor_c: CENTER ATOMS=nor_all
+nor_p: POSITION ATOM=nor_c
+height: CUSTOM ARG=nor_p.z VAR=z FUNC=z-52.0 PERIODIC=NO
+
+
+PRINT ARG=angle,height FILE=COLVAR STRIDE=500
+
+
+METAD ...
+  LABEL=metad
+  ARG=angle,height
+  SIGMA=1.5,0.1
+  HEIGHT=2.0
+  PACE=500
+  TEMP=300
+  BIASFACTOR=20
+  GRID_MIN=0.0,0.0
+  GRID_MAX=90.0,30.0
+  GRID_BIN=180,300
+  FILE=HILLS
+... METAD
