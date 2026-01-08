@@ -1,0 +1,68 @@
+# LAMMPS input for 1ns metadynamics simulation
+# Continuation from restart file
+
+# Files
+variable basename string "tio2_NOR_metad"
+variable restart_file string "tio2_NOR_adsorption_continue.restart"
+
+# System setup
+units real
+atom_style full
+boundary p p p
+
+# Read restart file
+read_restart ${restart_file}
+
+# Group fixed atoms
+region bottom_region block INF INF INF INF 59 INF
+group fixed region bottom_region
+group mobile subtract all fixed
+
+# Fix TiO2 atoms
+fix freeze fixed setforce 0.0 0.0 0.0
+
+# LJ wall at z=23.0 A
+fix wall_bottom all wall/lj126 zlo 23.0 0.1 3.0 2.5 pbc yes
+
+# ReaxFF potential
+pair_style reaxff NULL
+pair_coeff * * CHONSMgPNaTiClFAu.ff C F H N O Ti
+fix qeq all qeq/reaxff 50 0.0 8.0 1e-6 reaxff
+
+# Neighbor list
+neighbor 2.5 bin
+neigh_modify every 100 delay 0 check yes
+
+# Compute temperature
+compute T_mobile mobile temp
+
+# Plumed metadynamics
+fix metad all plumed plumedfile plumed_nor_analysis.dat outfile ${basename}_plumed.out
+
+# Output settings
+thermo 1000
+thermo_style custom step c_T_mobile pe ke etotal cpu scpu
+log ${basename}.log
+
+# Reset timestep
+reset_timestep 0
+
+# Timestep: 0.2 fs
+timestep 0.2
+
+# Temperature control
+fix nvt mobile nvt temp 300.0 300.0 100.0
+
+# Trajectory output (every 1 ps)
+dump traj all xtc 1000 ${basename}.xtc
+dump_modify traj sort id
+
+# Restart files (every 1 ps)
+restart 1000 ${basename}.restart1 ${basename}.restart2
+
+# Run 1ns metadynamics
+run 2500000
+
+# Final output
+write_data ${basename}_final.data
+write_restart ${basename}_final.restart
